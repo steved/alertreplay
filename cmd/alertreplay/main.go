@@ -131,7 +131,7 @@ type cli struct {
 func main() {
 	root := cli{}
 	ctx := kong.Parse(&root,
-		kong.Name("alert-backtester"),
+		kong.Name("alertreplay"),
 		kong.Description("Backtest alert rules or compare rule changes against historical data."),
 		kong.UsageOnError(),
 	)
