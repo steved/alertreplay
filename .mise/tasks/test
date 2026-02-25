@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Run unit tests"
+
+set -euo pipefail
+
+#USAGE arg "[pathspec]" help="Pathspec (packages/files) to format" default="./..."
+
+go test "${usage_pathspec:-./...}"
