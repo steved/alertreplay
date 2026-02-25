@@ -5,7 +5,7 @@ A CLI that replays alerting rules over historical Prometheus/VictoriaMetrics dat
 ## Usage
 
 ```bash
-alert-backtester \
+alertreplayer \
   --from '2025-12-01 00:00:00' \
   --by-cluster \                # optional: discover available clusters and run each in parallel
   /path/to/alerts.yaml \
@@ -27,7 +27,7 @@ The tool opens an interactive table showing open/resolved windows and lets you j
 Use `diff` to replay the same alert across two files and compare:
 
 ```bash
-alert-backtester diff \
+alertreplayer diff \
   --from '2025-12-01 00:00:00' \
   /path/to/alerts_old.yaml \
   /path/to/alerts_new.yaml \
