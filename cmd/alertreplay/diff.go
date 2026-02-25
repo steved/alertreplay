@@ -17,25 +17,15 @@ import (
 	"github.com/steved/alertreplay/internal/rule"
 )
 
-type diffCmd struct {
-	commonFlags
-
+type DiffCmd struct {
 	File1        string   `arg:"" name:"file1" help:"First alert rules file (Prometheus or VMRule format)." required:""`
 	File2        string   `arg:"" name:"file2" help:"Second alert rules file (Prometheus or VMRule format)." required:""`
 	AlertName    string   `arg:"" name:"alert-name" help:"Name of the alert to compare." required:""`
 	IgnoreLabels []string `help:"Labels to ignore when comparing alerts." name:"ignore-labels"`
 }
 
-func (cmd *diffCmd) Run() error {
-	cmd.configureLogger()
-
+func (cmd *DiffCmd) Run(g *Global) error {
 	ctx := context.Background()
-
-	now := time.Now()
-	fromTime, toTime, err := cmd.timeRange(now)
-	if err != nil {
-		return err
-	}
 
 	rule1, err := rule.ParseAlertRule(cmd.File1, cmd.AlertName)
 	if err != nil {
@@ -47,7 +37,7 @@ func (cmd *diffCmd) Run() error {
 		return fmt.Errorf("file2 (%s): parsing alert rule: %w", cmd.File2, err)
 	}
 
-	targets, err := cmd.clusterTargets(ctx, toTime)
+	targets, err := g.clusterTargets(ctx)
 	if err != nil {
 		return err
 	}
@@ -62,17 +52,17 @@ func (cmd *diffCmd) Run() error {
 	for _, target := range targets {
 		target := target
 		eg.Go(func() error {
-			exec, err := prometheus.NewExecutor(target.promURL, cmd.Parallelism)
+			exec, err := prometheus.NewExecutor(target.promURL, g.Parallelism)
 			if err != nil {
 				return fmt.Errorf("cluster %s: creating executor: %w", target.nameForLog(), err)
 			}
 
-			clusterAlerts1, err := alert.Run(ctx, exec, rule1, fromTime, toTime, cmd.Interval)
+			clusterAlerts1, err := alert.Run(ctx, exec, rule1, g.From, g.To, g.Interval)
 			if err != nil {
 				return fmt.Errorf("cluster %s file1 (%s): %w", target.nameForLog(), cmd.File1, err)
 			}
 
-			clusterAlerts2, err := alert.Run(ctx, exec, rule2, fromTime, toTime, cmd.Interval)
+			clusterAlerts2, err := alert.Run(ctx, exec, rule2, g.From, g.To, g.Interval)
 			if err != nil {
 				return fmt.Errorf("cluster %s file2 (%s): %w", target.nameForLog(), cmd.File2, err)
 			}
