@@ -87,7 +87,6 @@ func (cmd *DiffCmd) Run(g *Global) error {
 				return fmt.Errorf("target %s file2 (%s): %w", target, cmd.File2, err)
 			}
 
-			// TODO...
 			targetAlerts1 = alert.AddLabel(targetAlerts1, target)
 			targetAlerts2 = alert.AddLabel(targetAlerts2, target)
 

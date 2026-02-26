@@ -48,7 +48,7 @@ func (cmd *ReplayCmd) Run(g *Global) error {
 		eg.Go(func() error {
 			exec, err := prometheus.NewExecutor(g.PrometheusURL, g.Parallelism)
 			if err != nil {
-				return fmt.Errorf("target %s: creating executor: %w", target, err)
+				return fmt.Errorf("target %x: creating executor: %w", target.AppendString(nil), err)
 			}
 
 			targetRule := *r

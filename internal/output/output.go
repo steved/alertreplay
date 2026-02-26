@@ -273,9 +273,7 @@ func buildColumns(termWidth int, hasSourceCol bool) []table.Column {
 
 	paddingWidth := numCols * 2
 	labelsWidth := termWidth - baseStyle.GetHorizontalFrameSize() - paddingWidth - fixedWidth
-	if labelsWidth < 20 {
-		labelsWidth = 20
-	}
+	labelsWidth = max(labelsWidth, 20)
 
 	if hasSourceCol {
 		return []table.Column{

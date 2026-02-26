@@ -3,6 +3,7 @@ module github.com/steved/alertreplay
 go 1.26.0
 
 require (
+	github.com/VictoriaMetrics/metricsql v0.84.8
 	github.com/VictoriaMetrics/operator/api v0.66.1
 	github.com/alecthomas/kong v1.13.0
 	github.com/charmbracelet/bubbles v0.21.0
@@ -30,7 +31,6 @@ require (
 	github.com/VictoriaMetrics/VictoriaMetrics v1.131.0 // indirect
 	github.com/VictoriaMetrics/easyproto v0.1.4 // indirect
 	github.com/VictoriaMetrics/metrics v1.40.2 // indirect
-	github.com/VictoriaMetrics/metricsql v0.84.8 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.39.6 // indirect

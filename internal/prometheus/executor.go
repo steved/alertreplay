@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/VictoriaMetrics/metricsql"
 	"github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
@@ -45,7 +47,7 @@ func NewExecutor(prometheusURL string, parallelism int) (*Executor, error) {
 }
 
 // LabelValues retrieves all values for a given label via Prometheus.
-func (e *Executor) LabelValues(ctx context.Context, label string, ts time.Time) ([]string, error) {
+func (e *Executor) LabelValues(ctx context.Context, label string, ts time.Time) ([]metricsql.LabelFilter, error) {
 	ctx, cancel := context.WithTimeout(ctx, e.queryTimeout)
 	defer cancel()
 
@@ -64,20 +66,22 @@ func (e *Executor) LabelValues(ctx context.Context, label string, ts time.Time) 
 		return nil, fmt.Errorf("unexpected result type for label values discovery: %T", result)
 	}
 
-	values := make([]string, 0, len(vector))
+	values := make([]metricsql.LabelFilter, 0, len(vector))
 	for _, sample := range vector {
 		value := string(sample.Metric[model.LabelName(label)])
 		if value == "" {
 			continue
 		}
-		values = append(values, value)
+		values = append(values, metricsql.LabelFilter{Label: label, Value: value})
 	}
 
 	if len(values) == 0 {
 		return nil, fmt.Errorf("no values found with query %q", query)
 	}
 
-	slices.Sort(values)
+	slices.SortFunc(values, func(l, r metricsql.LabelFilter) int {
+		return strings.Compare(l.Value, r.Value)
+	})
 	values = slices.Compact(values)
 
 	return values, nil

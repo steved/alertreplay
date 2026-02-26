@@ -50,36 +50,36 @@ func (g *Global) Validate() error {
 }
 
 func (g *Global) Targets(ctx context.Context) ([]metricsql.LabelFilter, error) {
-	if g.By != "" {
+	var targets []metricsql.LabelFilter
+
+	switch {
+	case g.By != "":
 		exec, err := prometheus.NewExecutor(g.PrometheusURL, g.Parallelism)
 		if err != nil {
 			return nil, fmt.Errorf("creating Prometheus client: %w", err)
 		}
 
-		values, err := exec.LabelValues(ctx, g.By, g.To)
+		targets, err = exec.LabelValues(ctx, g.By, g.To)
 		if err != nil {
 			return nil, fmt.Errorf("discovering label values: %w", err)
 		}
 
-		zlog.Debug().Strs("targets", values).Msg("running alert per label value")
+	case len(g.Filters) > 0:
+		targets = g.Filters
+	default:
+		targets = []metricsql.LabelFilter{{}}
+	}
 
-		targets := make([]metricsql.LabelFilter, 0, len(values))
-		for _, value := range values {
-			targets = append(targets, metricsql.LabelFilter{
-				Label: g.By,
-				Value: value,
-			})
+	targetStr := make([]string, 0, len(targets))
+	for _, target := range targets {
+		if target.Label != "" {
+			targetStr = append(targetStr, string(target.AppendString(nil)))
 		}
-
-		return targets, nil
 	}
 
-	if len(g.Filters) > 0 {
-		zlog.Debug().Interface("targets", g.Filters).Msg("running alert per filter")
-		return g.Filters, nil
-	}
+	zlog.Debug().Interface("targets", targetStr).Msg("running alert per target")
 
-	return []metricsql.LabelFilter{{}}, nil
+	return targets, nil
 }
 
 type CLI struct {
