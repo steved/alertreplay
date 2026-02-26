@@ -11,7 +11,7 @@ RUN go mod download
 COPY . .
 
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-  go build -trimpath -ldflags="-s -w" -o /out/alertreplay ./cmd/alertreplay
+    go build -trimpath -ldflags="-s -w" -o /out/alertreplay ./cmd/alertreplay
 
 FROM gcr.io/distroless/static-debian13:nonroot
 

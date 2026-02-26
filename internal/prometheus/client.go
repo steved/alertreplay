@@ -227,5 +227,5 @@ func generateTimestamps(from time.Time, to time.Time, interval time.Duration) []
 }
 
 func alignToStep(t time.Time, step time.Duration) time.Time {
-	return time.UnixMilli((t.UnixMilli() / int64(step/time.Millisecond)) * int64(step/time.Millisecond))
+	return time.UnixMilli((t.UnixMilli() / int64(step/time.Millisecond)) * int64(step/time.Millisecond)).UTC()
 }
