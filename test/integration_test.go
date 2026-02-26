@@ -29,18 +29,19 @@ import (
 	"github.com/steved/alertreplay/internal/vmrule"
 )
 
+const (
+	prometheusScrapeInterval = 1 * time.Second
+	evaluationInterval       = 1 * time.Second
+	pollInterval             = 500 * time.Millisecond
+	downScrapesRequired      = 6
+	recoveryScrapesRequired  = 3
+	pollTimeout              = 2 * time.Minute
+)
+
 func TestIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	const (
-		prometheusScrapeInterval = 5 * time.Second
-		evaluationInterval       = 15 * time.Second
-		downScrapesRequired      = 6
-		recoveryScrapesRequired  = 3
-		pollTimeout              = 2 * time.Minute
-	)
 
 	reg, promEndpoint := setupPrometheus(t)
 
@@ -68,7 +69,7 @@ func TestIntegration(t *testing.T) {
 	urlBuilder, err := dashboard.New(dashboard.VMUI, "https://vmui/")
 	require.NoError(t, err)
 
-	evalFrom := time.Now().UTC().Add(-15 * time.Second)
+	evalFrom := time.Now().UTC().Add(-5 * prometheusScrapeInterval)
 
 	gauge.WithLabelValues("abc", "host1").Set(0)
 	waitForScrapedSamples(
@@ -131,14 +132,14 @@ func setupPrometheus(t *testing.T) (*prometheus.Registry, string) {
 	t.Cleanup(func() { _ = srv.Shutdown(context.Background()) })
 
 	promConfig := fmt.Sprintf(`global:
-  scrape_interval: 5s
-  evaluation_interval: 5s
+  scrape_interval: %s
+  evaluation_interval: %s
 scrape_configs:
   - job_name: test
     static_configs:
       - targets:
           - host.testcontainers.internal:%d
-`, port)
+`, prometheusScrapeInterval, prometheusScrapeInterval, port)
 
 	promContainer, err := testcontainers.GenericContainer(t.Context(), testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
@@ -189,7 +190,7 @@ func freezeAlerts(alerts []alert.Alert, expr string, urlBuilder dashboard.URLBui
 
 func waitForData(t *testing.T, ctx context.Context, api v1.API, query string) {
 	t.Helper()
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
 	for {
@@ -220,7 +221,7 @@ func waitForScrapedSamples(
 	step time.Duration,
 ) {
 	t.Helper()
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
 	for {
@@ -289,7 +290,7 @@ func waitForResolvedAlert(
 ) time.Time {
 	t.Helper()
 
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
 	for {
