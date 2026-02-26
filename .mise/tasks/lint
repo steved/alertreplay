@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+#MISE description="Lint Go code using golangci-lint"
+set -euo pipefail
+
+#USAGE flag "--fix" help="Apply changes automatically"
+
+args=()
+if [ "${usage_fix:-false}" = "true" ]; then
+  args+=(--fix)
+fi
+
+golangci-lint run --new=false "${args[@]}"

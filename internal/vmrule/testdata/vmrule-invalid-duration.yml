@@ -1,0 +1,9 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+spec:
+  groups:
+    - name: test
+      rules:
+        - alert: BadDuration
+          expr: up == 0
+          for: notaduration

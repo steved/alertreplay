@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Format code and fix newlines"
+#MISE alias="format"
+set -euo pipefail
+
+#USAGE arg "[pathspec]" help="Pathspec (packages/files) to format" default="./..."
+
+golangci-lint fmt "${usage_pathspec:-./...}"
