@@ -37,7 +37,7 @@ func (cmd *DiffCmd) Run(g *Global) error {
 		return fmt.Errorf("file2 (%s): parsing alert rule: %w", cmd.File2, err)
 	}
 
-	targets, err := g.clusterTargets(ctx)
+	targets, err := g.Targets(ctx)
 	if err != nil {
 		return err
 	}
@@ -52,27 +52,48 @@ func (cmd *DiffCmd) Run(g *Global) error {
 	for _, target := range targets {
 		target := target
 		eg.Go(func() error {
-			exec, err := prometheus.NewExecutor(target.promURL, g.Parallelism)
+			exec, err := prometheus.NewExecutor(g.PrometheusURL, g.Parallelism)
 			if err != nil {
-				return fmt.Errorf("cluster %s: creating executor: %w", target.nameForLog(), err)
+				return fmt.Errorf("target %s: creating executor: %w", target, err)
 			}
 
-			clusterAlerts1, err := alert.Run(ctx, exec, rule1, g.From, g.To, g.Interval)
-			if err != nil {
-				return fmt.Errorf("cluster %s file1 (%s): %w", target.nameForLog(), cmd.File1, err)
+			targetRule1 := *rule1
+			if target.Label != "" {
+				expr, err := prometheus.RewriteExpr(rule1.Expr, target)
+				if err != nil {
+					return fmt.Errorf("target %s: creating new expr: %w", target, err)
+				}
+
+				targetRule1.Expr = expr
 			}
 
-			clusterAlerts2, err := alert.Run(ctx, exec, rule2, g.From, g.To, g.Interval)
-			if err != nil {
-				return fmt.Errorf("cluster %s file2 (%s): %w", target.nameForLog(), cmd.File2, err)
+			targetRule2 := *rule2
+			if target.Label != "" {
+				expr, err := prometheus.RewriteExpr(rule2.Expr, target)
+				if err != nil {
+					return fmt.Errorf("target %s: creating new expr: %w", target, err)
+				}
+
+				targetRule2.Expr = expr
 			}
 
-			clusterAlerts1 = alert.AddClusterLabel(clusterAlerts1, target.name)
-			clusterAlerts2 = alert.AddClusterLabel(clusterAlerts2, target.name)
+			targetAlerts1, err := alert.Run(ctx, exec, &targetRule1, g.From, g.To, g.Interval)
+			if err != nil {
+				return fmt.Errorf("target %s file1 (%s): %w", target, cmd.File1, err)
+			}
+
+			targetAlerts2, err := alert.Run(ctx, exec, &targetRule2, g.From, g.To, g.Interval)
+			if err != nil {
+				return fmt.Errorf("target %s file2 (%s): %w", target, cmd.File2, err)
+			}
+
+			// TODO...
+			targetAlerts1 = alert.AddLabel(targetAlerts1, target)
+			targetAlerts2 = alert.AddLabel(targetAlerts2, target)
 
 			mu.Lock()
-			alerts1 = append(alerts1, clusterAlerts1...)
-			alerts2 = append(alerts2, clusterAlerts2...)
+			alerts1 = append(alerts1, targetAlerts1...)
+			alerts2 = append(alerts2, targetAlerts2...)
 			mu.Unlock()
 
 			return nil

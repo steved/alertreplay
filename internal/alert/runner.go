@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/VictoriaMetrics/metricsql"
 	"github.com/prometheus/prometheus/model/rulefmt"
 
 	"github.com/steved/alertreplay/internal/evaluator"
@@ -42,19 +43,19 @@ func Run(
 }
 
 // AddClusterLabel adds a cluster label to alerts that don't have one.
-func AddClusterLabel(alerts []Row, cluster string) []Row {
-	if cluster == "" {
+func AddLabel(alerts []Row, label metricsql.LabelFilter) []Row {
+	if label.Label == "" {
 		return alerts
 	}
 
 	for i := range alerts {
 		if alerts[i].Labels == nil {
-			alerts[i].Labels = map[string]string{"cluster": cluster}
+			alerts[i].Labels = map[string]string{label.Label: label.Value}
 			continue
 		}
 
-		if _, ok := alerts[i].Labels["cluster"]; !ok {
-			alerts[i].Labels["cluster"] = cluster
+		if _, ok := alerts[i].Labels[label.Label]; !ok {
+			alerts[i].Labels[label.Label] = label.Value
 		}
 	}
 

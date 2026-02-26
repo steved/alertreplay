@@ -33,7 +33,7 @@ func (cmd *ReplayCmd) Run(g *Global) error {
 		Dur("for", time.Duration(r.For)).
 		Msg("parsed alert rule")
 
-	targets, err := g.clusterTargets(ctx)
+	targets, err := g.Targets(ctx)
 	if err != nil {
 		return err
 	}
@@ -45,19 +45,28 @@ func (cmd *ReplayCmd) Run(g *Global) error {
 
 	var eg errgroup.Group
 	for _, target := range targets {
-		target := target
 		eg.Go(func() error {
-			exec, err := prometheus.NewExecutor(target.promURL, g.Parallelism)
+			exec, err := prometheus.NewExecutor(g.PrometheusURL, g.Parallelism)
 			if err != nil {
-				return fmt.Errorf("cluster %s: creating executor: %w", target.nameForLog(), err)
+				return fmt.Errorf("target %s: creating executor: %w", target, err)
 			}
 
-			alerts, err := alert.Run(ctx, exec, r, g.From, g.To, g.Interval)
-			if err != nil {
-				return fmt.Errorf("cluster %s: %w", target.nameForLog(), err)
+			targetRule := *r
+			if target.Label != "" {
+				expr, err := prometheus.RewriteExpr(r.Expr, target)
+				if err != nil {
+					return fmt.Errorf("target %s: creating new expr: %w", target, err)
+				}
+
+				targetRule.Expr = expr
 			}
 
-			alerts = alert.AddClusterLabel(alerts, target.name)
+			alerts, err := alert.Run(ctx, exec, &targetRule, g.From, g.To, g.Interval)
+			if err != nil {
+				return fmt.Errorf("target %s: %w", target, err)
+			}
+
+			alerts = alert.AddLabel(alerts, target)
 
 			mu.Lock()
 			allAlerts = append(allAlerts, alerts...)

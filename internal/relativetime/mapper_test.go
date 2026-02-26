@@ -14,7 +14,7 @@ func parseWithMapper(t *testing.T, input string) (time.Time, error) {
 	t.Helper()
 
 	var cli struct {
-		At time.Time `arg:"" type:"relativetime"`
+		At time.Time `arg:""`
 	}
 
 	parser, err := kong.New(&cli, kong.TypeMapper(reflect.TypeFor[time.Time](), Mapper))

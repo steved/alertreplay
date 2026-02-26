@@ -17,9 +17,8 @@ import (
 )
 
 const (
-	defaultQueryTimeout   = 2 * time.Minute
-	maxPointsPerQuery     = 10000
-	clusterDiscoveryQuery = `clamp_max(count(up) by (cluster), 1)`
+	defaultQueryTimeout = 2 * time.Minute
+	maxPointsPerQuery   = 10000
 )
 
 // Executor handles Prometheus query execution.
@@ -45,42 +44,43 @@ func NewExecutor(prometheusURL string, parallelism int) (*Executor, error) {
 	}, nil
 }
 
-// ListClusters discovers available clusters via Prometheus.
-func (e *Executor) ListClusters(ctx context.Context, ts time.Time) ([]string, error) {
+// LabelValues retrieves all values for a given label via Prometheus.
+func (e *Executor) LabelValues(ctx context.Context, label string, ts time.Time) ([]string, error) {
 	ctx, cancel := context.WithTimeout(ctx, e.queryTimeout)
 	defer cancel()
 
-	result, warnings, err := e.api.Query(ctx, clusterDiscoveryQuery, ts)
+	query := fmt.Sprintf("clamp_max(count(up) by (%s), 1)", label)
+	result, warnings, err := e.api.Query(ctx, query, ts)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, w := range warnings {
-		zlog.Warn().Str("warning", w).Msg("cluster discovery warning")
+		zlog.Warn().Str("warning", w).Msg("label values discovery warning")
 	}
 
 	vector, ok := result.(model.Vector)
 	if !ok {
-		return nil, fmt.Errorf("unexpected result type for cluster discovery: %T", result)
+		return nil, fmt.Errorf("unexpected result type for label values discovery: %T", result)
 	}
 
-	clusters := make([]string, 0, len(vector))
+	values := make([]string, 0, len(vector))
 	for _, sample := range vector {
-		cluster := string(sample.Metric["cluster"])
-		if cluster == "" {
+		value := string(sample.Metric[model.LabelName(label)])
+		if value == "" {
 			continue
 		}
-		clusters = append(clusters, cluster)
+		values = append(values, value)
 	}
 
-	if len(clusters) == 0 {
-		return nil, fmt.Errorf("no clusters found with query %q", clusterDiscoveryQuery)
+	if len(values) == 0 {
+		return nil, fmt.Errorf("no values found with query %q", query)
 	}
 
-	slices.Sort(clusters)
-	clusters = slices.Compact(clusters)
+	slices.Sort(values)
+	values = slices.Compact(values)
 
-	return clusters, nil
+	return values, nil
 }
 
 // Execute runs a range query and returns vectors indexed by timestamp.
@@ -111,6 +111,7 @@ func (e *Executor) Execute(
 	for i, w := range windows {
 		eg.Go(func() error {
 			zlog.Debug().
+				Str("query", expr).
 				Int("window", i+1).
 				Int("total", len(windows)).
 				Time("from", w.start).
