@@ -102,8 +102,9 @@ func (g *Global) Targets(ctx context.Context) ([]metricsql.LabelFilter, error) {
 type CLI struct {
 	Global
 
-	Replay ReplayCmd `cmd:"" help:"Replay an alert rule against historical data." default:"withargs"`
-	Diff   DiffCmd   `cmd:"" help:"Compare an alert rule between two files."`
+	Replay  ReplayCmd    `cmd:"" help:"Replay an alert rule against historical data." default:"withargs"`
+	Diff    DiffCmd      `cmd:"" help:"Compare an alert rule between two files."`
+	Version kong.VersionFlag `help:"Print version and exit."`
 }
 
 func main() {
@@ -115,6 +116,7 @@ func main() {
 		kong.Name("alertreplay"),
 		kong.Description("Replay or compare alert rules against historical data."),
 		kong.UsageOnError(),
+		kong.Vars{"version": version},
 		kong.TypeMapper(reflect.TypeFor[time.Time](), relativetime.Mapper),
 		kong.TypeMapper(reflect.TypeFor[metricsql.LabelFilter](), prometheus.LabelFilterMapper),
 	)
