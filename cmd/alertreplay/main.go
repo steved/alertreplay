@@ -102,8 +102,8 @@ func (g *Global) Targets(ctx context.Context) ([]metricsql.LabelFilter, error) {
 type CLI struct {
 	Global
 
-	Replay  ReplayCmd    `cmd:"" help:"Replay an alert rule against historical data." default:"withargs"`
-	Diff    DiffCmd      `cmd:"" help:"Compare an alert rule between two files."`
+	Replay  ReplayCmd        `cmd:"" help:"Replay an alert rule against historical data." default:"withargs"`
+	Diff    DiffCmd          `cmd:"" help:"Compare an alert rule between two files."`
 	Version kong.VersionFlag `help:"Print version and exit."`
 }
 

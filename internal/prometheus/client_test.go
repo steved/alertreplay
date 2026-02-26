@@ -1,9 +1,12 @@
 package prometheus
 
 import (
+	"context"
 	"testing"
 	"time"
 
+	"github.com/VictoriaMetrics/metricsql"
+	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/stretchr/testify/assert"
@@ -163,4 +166,45 @@ func TestProcessMatrix(t *testing.T) {
 			}
 		})
 	}
+}
+
+type fakePrometheusClient struct {
+	promv1.API
+	query  string
+	result model.Value
+	err    error
+}
+
+func (f *fakePrometheusClient) Query(
+	_ context.Context,
+	query string,
+	_ time.Time,
+	_ ...promv1.Option,
+) (model.Value, promv1.Warnings, error) {
+	f.query = query
+	return f.result, nil, f.err
+}
+
+func TestLabelValues(t *testing.T) {
+	api := &fakePrometheusClient{
+		result: model.Vector{
+			&model.Sample{Metric: model.Metric{"cluster": "b"}},
+			&model.Sample{Metric: model.Metric{"cluster": "a"}},
+			&model.Sample{Metric: model.Metric{"cluster": "a"}},
+			&model.Sample{Metric: model.Metric{"cluster": ""}},
+		},
+	}
+	client := &APIClient{
+		api:          api,
+		queryTimeout: time.Second,
+	}
+
+	got, err := client.LabelValues(t.Context(), "cluster", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	require.NoError(t, err)
+
+	assert.Equal(t, `clamp_max(count({cluster!=""}) by (cluster), 1)`, api.query)
+	assert.Equal(t, []metricsql.LabelFilter{
+		{Label: "cluster", Value: "a"},
+		{Label: "cluster", Value: "b"},
+	}, got)
 }

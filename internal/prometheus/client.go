@@ -50,7 +50,7 @@ func (a *APIClient) LabelValues(ctx context.Context, label string, ts time.Time)
 	ctx, cancel := context.WithTimeout(ctx, a.queryTimeout)
 	defer cancel()
 
-	query := fmt.Sprintf("clamp_max(count(up) by (%s), 1)", label)
+	query := fmt.Sprintf(`clamp_max(count({%s!=""}) by (%s), 1)`, label, label)
 	result, warnings, err := a.api.Query(ctx, query, ts)
 	if err != nil {
 		return nil, err
