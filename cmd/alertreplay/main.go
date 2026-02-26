@@ -44,6 +44,10 @@ func (g *Global) Validate() error {
 		return fmt.Errorf("--parallelism must be at least 1")
 	}
 
+	if g.Interval < time.Millisecond {
+		return fmt.Errorf("--interval must be at least 1ms")
+	}
+
 	if !g.From.Before(g.To) {
 		return fmt.Errorf("--from must be before --to")
 	}

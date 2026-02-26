@@ -102,39 +102,36 @@ func (a *APIClient) QueryExpr(
 		vectorsMu  sync.Mutex
 	)
 
-	windows := make(map[time.Time]struct{}, len(timestamps))
-	for _, ts := range timestamps {
-		windows[ts] = struct{}{}
-	}
-
 	var (
-		eg errgroup.Group
-		i  = 0
+		eg           errgroup.Group
+		totalWindows = len(timestamps)
 	)
 	eg.SetLimit(a.parallelism)
 
-	zlog.Debug().Int("windows", len(windows)).Msg("split time range")
+	zlog.Debug().Int("windows", totalWindows).Msg("split time range")
 
-	for start := range windows {
-		i += 1
+	for i, start := range timestamps {
+		var (
+			windowNumber = i + 1
+			windowEnd    = start.Add(interval)
+		)
 
-		end := start.Add(interval)
-		if end.After(to) {
-			end = to
+		if windowEnd.After(to) {
+			windowEnd = to
 		}
 
 		eg.Go(func() error {
 			zlog.Debug().
 				Str("query", expr).
-				Int("window", i).
-				Int("total", len(windows)).
+				Int("window", windowNumber).
+				Int("total", totalWindows).
 				Time("from", start).
-				Time("to", end).
+				Time("to", windowEnd).
 				Msg("executing query")
 
-			matrix, err := a.queryRange(ctx, expr, start, end, interval)
+			matrix, err := a.queryRange(ctx, expr, start, windowEnd, interval)
 			if err != nil {
-				return fmt.Errorf("querying window %d/%d: %w", i, len(windows), err)
+				return fmt.Errorf("querying window %d/%d: %w", windowNumber, totalWindows, err)
 			}
 
 			samples := a.processMatrix(matrix, start)

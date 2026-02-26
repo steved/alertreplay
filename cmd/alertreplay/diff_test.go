@@ -84,6 +84,7 @@ func TestGlobalValidate(t *testing.T) {
 			global: Global{
 				From:        base,
 				To:          base.Add(time.Hour),
+				Interval:    time.Second,
 				Parallelism: 10,
 			},
 		},
@@ -92,6 +93,7 @@ func TestGlobalValidate(t *testing.T) {
 			global: Global{
 				From:        base.Add(time.Hour),
 				To:          base,
+				Interval:    time.Second,
 				Parallelism: 10,
 			},
 			wantErr: "--from must be before --to",
@@ -101,6 +103,7 @@ func TestGlobalValidate(t *testing.T) {
 			global: Global{
 				From:        base,
 				To:          base,
+				Interval:    time.Second,
 				Parallelism: 10,
 			},
 			wantErr: "--from must be before --to",
@@ -110,6 +113,7 @@ func TestGlobalValidate(t *testing.T) {
 			global: Global{
 				From:        base,
 				To:          base.Add(time.Hour),
+				Interval:    time.Second,
 				Parallelism: 0,
 			},
 			wantErr: "--parallelism must be at least 1",
@@ -119,9 +123,40 @@ func TestGlobalValidate(t *testing.T) {
 			global: Global{
 				From:        base,
 				To:          base.Add(time.Hour),
+				Interval:    time.Second,
 				Parallelism: -1,
 			},
 			wantErr: "--parallelism must be at least 1",
+		},
+		{
+			name: "interval zero",
+			global: Global{
+				From:        base,
+				To:          base.Add(time.Hour),
+				Interval:    0,
+				Parallelism: 10,
+			},
+			wantErr: "--interval must be at least 1ms",
+		},
+		{
+			name: "interval below 1ms",
+			global: Global{
+				From:        base,
+				To:          base.Add(time.Hour),
+				Interval:    500 * time.Microsecond,
+				Parallelism: 10,
+			},
+			wantErr: "--interval must be at least 1ms",
+		},
+		{
+			name: "interval negative",
+			global: Global{
+				From:        base,
+				To:          base.Add(time.Hour),
+				Interval:    -time.Second,
+				Parallelism: 10,
+			},
+			wantErr: "--interval must be at least 1ms",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
