@@ -1,0 +1,13 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: dev-alerts
+spec:
+  groups:
+    - name: dev
+      rules:
+        - alert: AvalancheSeriesAbsent
+          expr: absent(avalanche_metric_mmmmm_0_0{series_id="0"})
+          for: 0s
+          labels:
+            severity: warning

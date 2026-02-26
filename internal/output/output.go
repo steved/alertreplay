@@ -2,6 +2,7 @@ package output
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"runtime"
@@ -171,7 +172,7 @@ func PrintEvents(alerts []alert.Alert) error {
 	}
 
 	if !term.IsTerminal(int(os.Stdout.Fd())) {
-		return printEventsMarkdown(alerts)
+		return RenderMarkdown(os.Stdout, alerts)
 	}
 
 	termWidth := 140
@@ -190,7 +191,8 @@ func PrintEvents(alerts []alert.Alert) error {
 	return nil
 }
 
-func printEventsMarkdown(alerts []alert.Alert) error {
+// RenderMarkdown writes alerts as a markdown table to w.
+func RenderMarkdown(w io.Writer, alerts []alert.Alert) error {
 	headers := []string{"Opened", "Resolved", "Duration", "Labels", "URL"}
 
 	hasSourceCol := slices.ContainsFunc(alerts, func(alert alert.Alert) bool { return alert.Source != "" })
@@ -198,7 +200,7 @@ func printEventsMarkdown(alerts []alert.Alert) error {
 		headers = append([]string{"Source"}, headers...)
 	}
 
-	re := lipgloss.NewRenderer(os.Stdout)
+	re := lipgloss.NewRenderer(w)
 	cellStyle := re.NewStyle().Padding(0, 1)
 	t := lipglosstable.New().
 		Headers(headers...).
@@ -224,9 +226,9 @@ func printEventsMarkdown(alerts []alert.Alert) error {
 		}
 	}
 
-	fmt.Println(t.Render())
+	_, err := fmt.Fprintln(w, t.Render())
 
-	return nil
+	return err
 }
 
 func openBrowser(url string) {

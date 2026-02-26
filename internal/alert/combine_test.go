@@ -31,7 +31,7 @@ func TestCombineEvents(t *testing.T) {
 			want: []Alert{
 				{
 					OpenedAt:   base,
-					ResolvedAt: ptr(base.Add(5 * time.Minute)),
+					ResolvedAt: new(base.Add(5 * time.Minute)),
 					Labels:     map[string]string{"job": "api"},
 				},
 			},
@@ -65,7 +65,7 @@ func TestCombineEvents(t *testing.T) {
 			want: []Alert{
 				{
 					OpenedAt:   base,
-					ResolvedAt: ptr(base.Add(5 * time.Minute)),
+					ResolvedAt: new(base.Add(5 * time.Minute)),
 					Labels:     map[string]string{"job": "api"},
 				},
 				{
@@ -85,12 +85,12 @@ func TestCombineEvents(t *testing.T) {
 			want: []Alert{
 				{
 					OpenedAt:   base,
-					ResolvedAt: ptr(base.Add(5 * time.Minute)),
+					ResolvedAt: new(base.Add(5 * time.Minute)),
 					Labels:     map[string]string{"job": "early"},
 				},
 				{
 					OpenedAt:   base.Add(10 * time.Minute),
-					ResolvedAt: ptr(base.Add(15 * time.Minute)),
+					ResolvedAt: new(base.Add(15 * time.Minute)),
 					Labels:     map[string]string{"job": "late"},
 				},
 			},
@@ -102,5 +102,3 @@ func TestCombineEvents(t *testing.T) {
 		})
 	}
 }
-
-func ptr(t time.Time) *time.Time { return &t }

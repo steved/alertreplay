@@ -1,0 +1,33 @@
+services:
+  avalanche:
+    image: quay.io/prometheuscommunity/avalanche
+    command:
+      - --metric-count=5
+      - --label-count=3
+      - --series-count=10
+      - --value-interval=15
+      - --series-interval=120
+      - --metric-interval=600
+      - --port=9001
+    ports:
+      - "9001:9001"
+
+  prometheus:
+    image: prom/prometheus:v3.3.0
+    volumes:
+      - ./dev/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - avalanche
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics
+    command:
+      - -promscrape.config=/etc/victoriametrics/scrape.yml
+    volumes:
+      - ./dev/victoriametrics-scrape.yml:/etc/victoriametrics/scrape.yml:ro
+    ports:
+      - "8428:8428"
+    depends_on:
+      - avalanche

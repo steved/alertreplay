@@ -12,29 +12,23 @@ import (
 	zlog "github.com/rs/zerolog/log"
 )
 
-// EventType represents the type of alert event.
 type EventType int
 
 const (
-	// EventOpened indicates an alert has started firing.
 	EventOpened EventType = iota
-	// EventResolved indicates an alert has stopped firing.
 	EventResolved
 )
 
-// Event represents a single alert state change.
 type Event struct {
 	Time   time.Time
 	Labels map[string]string
 	Type   EventType
 }
 
-// Evaluator evaluates alert rules against pre-fetched data.
 type Evaluator struct {
 	rule *rules.AlertingRule
 }
 
-// New creates a new rule evaluator.
 func New(name string, expr string, forDuration time.Duration) (*Evaluator, error) {
 	parsedExpr, err := parser.ParseExpr(expr)
 	if err != nil {
@@ -54,9 +48,7 @@ func New(name string, expr string, forDuration time.Duration) (*Evaluator, error
 		slog.Default(),
 	)
 
-	return &Evaluator{
-		rule: rule,
-	}, nil
+	return &Evaluator{rule: rule}, nil
 }
 
 type firingAlert struct {

@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/prometheus/prometheus/model/rulefmt"
-	"github.com/prometheus/prometheus/promql"
-	"github.com/prometheus/prometheus/rules"
 
 	"github.com/steved/alertreplay/internal/evaluator"
 	"github.com/steved/alertreplay/internal/prometheus"
@@ -32,16 +30,10 @@ func Evaluate(
 		return nil, fmt.Errorf("creating rule evaluator: %w", err)
 	}
 
-	events, err := eval.Evaluate(ctx, CachedQueryFunc(vectors), timestamps)
+	events, err := eval.Evaluate(ctx, prometheus.CachedQueryFunc(vectors), timestamps)
 	if err != nil {
 		return nil, fmt.Errorf("evaluating rule: %w", err)
 	}
 
 	return CombineEvents(events, rule.Expr), nil
-}
-
-func CachedQueryFunc(cache map[int64]promql.Vector) rules.QueryFunc {
-	return func(_ context.Context, _ string, t time.Time) (promql.Vector, error) {
-		return cache[t.UnixMilli()], nil
-	}
 }

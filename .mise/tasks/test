@@ -6,3 +6,4 @@ set -euo pipefail
 #USAGE arg "[pathspec]" help="Pathspec (packages/files) to format" default="./..."
 
 go test "${usage_pathspec:-./...}"
+go test -tags=integration -timeout=5m "${usage_pathspec:-./...}"

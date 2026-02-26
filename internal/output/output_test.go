@@ -72,18 +72,17 @@ func TestBuildColumns(t *testing.T) {
 				assert.Equal(t, tt.wantFirst, cols[0].Title)
 			}
 
-			// Verify fixed column widths
 			if tt.hasSourceCol {
 				assert.Equal(t, colWidthSource, cols[0].Width)
 				assert.Equal(t, colWidthOpened, cols[1].Width)
 				assert.Equal(t, colWidthResolved, cols[2].Width)
 				assert.Equal(t, colWidthDuration, cols[3].Width)
-				assert.GreaterOrEqual(t, cols[4].Width, 20) // labels minimum
+				assert.GreaterOrEqual(t, cols[4].Width, 20)
 			} else {
 				assert.Equal(t, colWidthOpened, cols[0].Width)
 				assert.Equal(t, colWidthResolved, cols[1].Width)
 				assert.Equal(t, colWidthDuration, cols[2].Width)
-				assert.GreaterOrEqual(t, cols[3].Width, 20) // labels minimum
+				assert.GreaterOrEqual(t, cols[3].Width, 20)
 			}
 		})
 	}

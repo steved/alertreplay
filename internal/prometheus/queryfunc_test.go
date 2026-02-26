@@ -1,4 +1,4 @@
-package alert
+package prometheus
 
 import (
 	"context"

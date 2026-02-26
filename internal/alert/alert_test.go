@@ -71,11 +71,15 @@ func TestMatch(t *testing.T) {
 }
 
 func TestSort(t *testing.T) {
+	var alerts []Alert
+	Sort(alerts)
+	assert.Empty(t, alerts)
+
 	t1 := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 	t2 := time.Date(2026, 1, 1, 13, 0, 0, 0, time.UTC)
 	t3 := time.Date(2026, 1, 1, 14, 0, 0, 0, time.UTC)
 
-	alerts := []Alert{
+	alerts = []Alert{
 		{OpenedAt: t3},
 		{OpenedAt: t1},
 		{OpenedAt: t2},
@@ -86,12 +90,6 @@ func TestSort(t *testing.T) {
 	assert.Equal(t, t1, alerts[0].OpenedAt)
 	assert.Equal(t, t2, alerts[1].OpenedAt)
 	assert.Equal(t, t3, alerts[2].OpenedAt)
-}
-
-func TestSort_empty(t *testing.T) {
-	var alerts []Alert
-	Sort(alerts) // should not panic
-	assert.Empty(t, alerts)
 }
 
 func TestFormatLabels(t *testing.T) {
