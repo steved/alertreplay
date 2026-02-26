@@ -1,4 +1,6 @@
 .git
 .github
+.goreleaser.yml
 .mise
-testdata
+dev
+docker-compose.yml
