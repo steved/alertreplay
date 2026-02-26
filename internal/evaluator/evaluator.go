@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/prometheus/prometheus/model/labels"
-	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/prometheus/prometheus/rules"
 	zlog "github.com/rs/zerolog/log"
@@ -46,12 +45,12 @@ func New(name string, expr string, forDuration time.Duration) (*Evaluator, error
 		name,
 		parsedExpr,
 		forDuration,
-		0, // keepFiringFor
+		0,
 		labels.EmptyLabels(),
 		labels.EmptyLabels(),
 		labels.EmptyLabels(),
 		"",
-		true, // restored - treat as if state was restored to avoid initial pending
+		true, // treat as if state was restored to avoid initial pending
 		slog.Default(),
 	)
 
@@ -65,7 +64,6 @@ type firingAlert struct {
 	firedAt time.Time
 }
 
-// Evaluate runs the alert rule against the provided timestamps using queryFn.
 func (e *Evaluator) Evaluate(
 	ctx context.Context,
 	queryFn rules.QueryFunc,
@@ -135,16 +133,4 @@ func (e *Evaluator) Evaluate(
 	}
 
 	return events, nil
-}
-
-// BuildQueryFunc creates a rules.QueryFunc that retrieves data from a pre-populated cache.
-func BuildQueryFunc(cache map[int64]promql.Vector) rules.QueryFunc {
-	return func(_ context.Context, _ string, t time.Time) (promql.Vector, error) {
-		vec, ok := cache[t.UnixMilli()]
-		if !ok {
-			return nil, nil
-		}
-
-		return vec, nil
-	}
 }

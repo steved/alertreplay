@@ -78,7 +78,7 @@ func (m *tableModel) reflow() {
 
 func (m *tableModel) refreshContent() {
 	content := baseStyle.Render(m.table.View()) +
-		"\n  Press enter to open Grafana, ←/→ to scroll, q to quit\n"
+		"\n  Press enter to open UI, ←/→ to scroll, q to quit\n"
 	m.viewport.SetContent(content)
 }
 
@@ -87,15 +87,15 @@ func (m tableModel) View() string {
 }
 
 func newTableModel(
-	alertRows []alert.Row,
+	alerts []alert.Alert,
 	termWidth int,
 	termHeight int,
 ) tableModel {
-	hasSourceCol := slices.ContainsFunc(alertRows, func(ar alert.Row) bool { return ar.Source != "" })
+	hasSourceCol := slices.ContainsFunc(alerts, func(ar alert.Alert) bool { return ar.Source != "" })
 
-	rows := make([]table.Row, 0, len(alertRows))
-	links := make([]string, 0, len(alertRows))
-	for _, ar := range alertRows {
+	rows := make([]table.Row, 0, len(alerts))
+	links := make([]string, 0, len(alerts))
+	for _, ar := range alerts {
 		resolvedStr := ""
 		durationStr := ""
 		if ar.ResolvedAt != nil {
@@ -125,7 +125,7 @@ func newTableModel(
 		}
 
 		rows = append(rows, row)
-		links = append(links, ar.GrafanaURL)
+		links = append(links, ar.URL)
 	}
 
 	columns := buildColumns(termWidth, hasSourceCol)
@@ -164,15 +164,14 @@ func newTableModel(
 	return m
 }
 
-// PrintEvents displays alert rows in a terminal table or markdown format.
-func PrintEvents(alertRows []alert.Row) error {
-	if len(alertRows) == 0 {
+func PrintEvents(alerts []alert.Alert) error {
+	if len(alerts) == 0 {
 		zlog.Info().Msg("No alert events found.")
 		return nil
 	}
 
 	if !term.IsTerminal(int(os.Stdout.Fd())) {
-		return printEventsMarkdown(alertRows)
+		return printEventsMarkdown(alerts)
 	}
 
 	termWidth := 140
@@ -182,7 +181,7 @@ func PrintEvents(alertRows []alert.Row) error {
 		termHeight = h
 	}
 
-	m := newTableModel(alertRows, termWidth, termHeight)
+	m := newTableModel(alerts, termWidth, termHeight)
 	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("running table: %w", err)
@@ -191,10 +190,10 @@ func PrintEvents(alertRows []alert.Row) error {
 	return nil
 }
 
-func printEventsMarkdown(alertRows []alert.Row) error {
+func printEventsMarkdown(alerts []alert.Alert) error {
 	headers := []string{"Opened", "Resolved", "Duration", "Labels", "URL"}
 
-	hasSourceCol := slices.ContainsFunc(alertRows, func(row alert.Row) bool { return row.Source != "" })
+	hasSourceCol := slices.ContainsFunc(alerts, func(alert alert.Alert) bool { return alert.Source != "" })
 	if hasSourceCol {
 		headers = append([]string{"Source"}, headers...)
 	}
@@ -210,7 +209,7 @@ func printEventsMarkdown(alertRows []alert.Row) error {
 			return cellStyle
 		})
 
-	for _, ar := range alertRows {
+	for _, ar := range alerts {
 		resolvedStr := "UNRESOLVED"
 		durationStr := "--"
 		if ar.ResolvedAt != nil {
@@ -219,9 +218,9 @@ func printEventsMarkdown(alertRows []alert.Row) error {
 		}
 
 		if hasSourceCol {
-			t.Row(ar.Source, ar.OpenedAt.UTC().Format(outputTimeFormat), resolvedStr, durationStr, alert.FormatLabels(ar.Labels), ar.GrafanaURL)
+			t.Row(ar.Source, ar.OpenedAt.UTC().Format(outputTimeFormat), resolvedStr, durationStr, alert.FormatLabels(ar.Labels), ar.URL)
 		} else {
-			t.Row(ar.OpenedAt.UTC().Format(outputTimeFormat), resolvedStr, durationStr, alert.FormatLabels(ar.Labels), ar.GrafanaURL)
+			t.Row(ar.OpenedAt.UTC().Format(outputTimeFormat), resolvedStr, durationStr, alert.FormatLabels(ar.Labels), ar.URL)
 		}
 	}
 

@@ -12,21 +12,22 @@ import (
 	"github.com/steved/alertreplay/internal/alert"
 	"github.com/steved/alertreplay/internal/output"
 	"github.com/steved/alertreplay/internal/prometheus"
-	"github.com/steved/alertreplay/internal/rule"
+	"github.com/steved/alertreplay/internal/vmrule"
 )
 
 type ReplayCmd struct {
-	AlertFile string `arg:"" name:"alert-file" help:"Alert rules file (Prometheus or VMRule format)." required:""`
+	AlertFile string `arg:"" name:"alert-file" help:"Alert rules file (VMRule format)." required:""`
 	AlertName string `arg:"" name:"alert-name" help:"Name of the alert to replay." required:""`
 }
 
 func (cmd *ReplayCmd) Run(g *Global) error {
 	ctx := context.Background()
 
-	r, err := rule.ParseAlertRule(cmd.AlertFile, cmd.AlertName)
+	r, err := vmrule.ParseAlertRule(cmd.AlertFile, cmd.AlertName)
 	if err != nil {
 		return fmt.Errorf("parsing alert rule: %w", err)
 	}
+
 	zlog.Debug().
 		Str("alert", r.Alert).
 		Str("expr", r.Expr).
@@ -40,33 +41,31 @@ func (cmd *ReplayCmd) Run(g *Global) error {
 
 	var (
 		mu        sync.Mutex
-		allAlerts []alert.Row
+		allAlerts []alert.Alert
 	)
+
+	client, err := prometheus.NewAPIClient(g.PrometheusURL, g.Parallelism)
+	if err != nil {
+		return fmt.Errorf("creating prometheus API client: %w", err)
+	}
 
 	var eg errgroup.Group
 	for _, target := range targets {
 		eg.Go(func() error {
-			exec, err := prometheus.NewExecutor(g.PrometheusURL, g.Parallelism)
-			if err != nil {
-				return fmt.Errorf("target %x: creating executor: %w", target.AppendString(nil), err)
-			}
-
 			targetRule := *r
 			if target.Label != "" {
 				expr, err := prometheus.RewriteExpr(r.Expr, target)
 				if err != nil {
-					return fmt.Errorf("target %s: creating new expr: %w", target, err)
+					return fmt.Errorf("creating new expr for target %s: %w", target.AppendString(nil), err)
 				}
 
 				targetRule.Expr = expr
 			}
 
-			alerts, err := alert.Run(ctx, exec, &targetRule, g.From, g.To, g.Interval)
+			alerts, err := alert.Evaluate(ctx, client, targetRule, g.From, g.To, g.Interval)
 			if err != nil {
-				return fmt.Errorf("target %s: %w", target, err)
+				return fmt.Errorf("executing alert expr: %w", err)
 			}
-
-			alerts = alert.AddLabel(alerts, target)
 
 			mu.Lock()
 			allAlerts = append(allAlerts, alerts...)
@@ -80,7 +79,7 @@ func (cmd *ReplayCmd) Run(g *Global) error {
 		return err
 	}
 
-	alert.SortRows(allAlerts)
+	alert.Sort(allAlerts)
 
 	return output.PrintEvents(allAlerts)
 }

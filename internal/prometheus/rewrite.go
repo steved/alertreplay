@@ -20,14 +20,10 @@ func RewriteExpr(expr string, filters ...metricsql.LabelFilter) (string, error) 
 			return
 		}
 
-		if len(metric.LabelFilterss) == 0 {
-			metric.LabelFilterss = [][]metricsql.LabelFilter{{}}
-		}
 		for i := range metric.LabelFilterss {
 			metric.LabelFilterss[i] = append(metric.LabelFilterss[i], filters...)
 		}
 	})
 
-	buf := parsed.AppendString(nil)
-	return string(buf), nil
+	return string(parsed.AppendString(nil)), nil
 }

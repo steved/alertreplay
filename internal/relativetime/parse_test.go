@@ -23,11 +23,11 @@ func TestParse(t *testing.T) {
 	withFixedNow(t, fixed)
 
 	tests := []struct {
-		name      string
-		input     string
-		want      time.Time
-		wantErr   bool
-		checkUTC  bool
+		name     string
+		input    string
+		want     time.Time
+		wantErr  bool
+		checkUTC bool
 	}{
 		{
 			name:  "now trimmed and mixed case",

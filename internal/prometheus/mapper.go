@@ -11,7 +11,9 @@ import (
 
 var LabelFilterMapper kong.MapperFunc = func(ctx *kong.DecodeContext, target reflect.Value) error {
 	var filterStr string
-	ctx.Scan.PopValueInto("string", &filterStr)
+	if err := ctx.Scan.PopValueInto("string", &filterStr); err != nil {
+		return err
+	}
 
 	kv := strings.SplitN(filterStr, "=", 2)
 	if len(kv) != 2 {

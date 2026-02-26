@@ -1,6 +1,8 @@
 version: "2"
+
 run:
   allow-parallel-runners: true
+
 linters:
   default: none
   enable:
@@ -29,6 +31,7 @@ linters:
     revive:
       rules:
         - name: comment-spacings
+
 formatters:
   enable:
     - gofmt
@@ -36,7 +39,7 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/groq
+        - github.com/steved
   exclusions:
     generated: lax
     paths:

@@ -1,4 +1,4 @@
-package rule
+package vmrule
 
 import (
 	"fmt"
@@ -10,30 +10,29 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ParseAlertRule parses a VMRule file and returns the alert rule with the given name.
 func ParseAlertRule(filePath string, alertName string) (*rulefmt.Rule, error) {
 	groups, err := parseVMRuleFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed parsing VMRule file: %w", err)
+		return nil, fmt.Errorf("parsing VMRule file: %w", err)
 	}
 
 	rule, err := findVMAlertRule(groups, alertName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find alert rule: %w", err)
+		return nil, fmt.Errorf("finding alert rule: %w", err)
 	}
 
 	return rule, nil
 }
 
 func parseVMRuleFile(filePath string) ([]v1beta1.RuleGroup, error) {
-	data, err := os.ReadFile(filePath)
+	file, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed reading file: %w", err)
+		return nil, fmt.Errorf("reading file %q: %w", filePath, err)
 	}
 
 	var vmRule v1beta1.VMRule
-	if err := yaml.Unmarshal(data, &vmRule); err != nil {
-		return nil, fmt.Errorf("failed unmarshaling YAML: %w", err)
+	if err := yaml.Unmarshal(file, &vmRule); err != nil {
+		return nil, fmt.Errorf("unmarshaling YAML: %w", err)
 	}
 
 	return vmRule.Spec.Groups, nil
@@ -47,7 +46,7 @@ func findVMAlertRule(groups []v1beta1.RuleGroup, alertName string) (*rulefmt.Rul
 				if r.For != "" {
 					parsed, err := model.ParseDuration(r.For)
 					if err != nil {
-						return nil, fmt.Errorf("failed parsing duration %q: %w", r.For, err)
+						return nil, fmt.Errorf("parsing duration %q: %w", r.For, err)
 					}
 					forDur = parsed
 				}

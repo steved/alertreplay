@@ -20,39 +20,38 @@ import (
 
 const (
 	defaultQueryTimeout = 2 * time.Minute
-	maxPointsPerQuery   = 10000
 )
 
-// Executor handles Prometheus query execution.
-type Executor struct {
+type Client interface {
+	LabelValues(context.Context, string, time.Time) ([]metricsql.LabelFilter, error)
+	QueryExpr(context.Context, string, time.Time, time.Time, time.Duration) (map[int64]promql.Vector, []time.Time, error)
+}
+
+type APIClient struct {
 	api          v1.API
 	parallelism  int
 	queryTimeout time.Duration
 }
 
-// NewExecutor creates a new Prometheus query executor.
-func NewExecutor(prometheusURL string, parallelism int) (*Executor, error) {
-	client, err := api.NewClient(api.Config{
-		Address: prometheusURL,
-	})
+func NewAPIClient(prometheusURL string, parallelism int) (*APIClient, error) {
+	client, err := api.NewClient(api.Config{Address: prometheusURL})
 	if err != nil {
 		return nil, fmt.Errorf("creating Prometheus client: %w", err)
 	}
 
-	return &Executor{
+	return &APIClient{
 		api:          v1.NewAPI(client),
 		parallelism:  parallelism,
 		queryTimeout: defaultQueryTimeout,
 	}, nil
 }
 
-// LabelValues retrieves all values for a given label via Prometheus.
-func (e *Executor) LabelValues(ctx context.Context, label string, ts time.Time) ([]metricsql.LabelFilter, error) {
-	ctx, cancel := context.WithTimeout(ctx, e.queryTimeout)
+func (a *APIClient) LabelValues(ctx context.Context, label string, ts time.Time) ([]metricsql.LabelFilter, error) {
+	ctx, cancel := context.WithTimeout(ctx, a.queryTimeout)
 	defer cancel()
 
 	query := fmt.Sprintf("clamp_max(count(up) by (%s), 1)", label)
-	result, warnings, err := e.api.Query(ctx, query, ts)
+	result, warnings, err := a.api.Query(ctx, query, ts)
 	if err != nil {
 		return nil, err
 	}
@@ -87,8 +86,7 @@ func (e *Executor) LabelValues(ctx context.Context, label string, ts time.Time) 
 	return values, nil
 }
 
-// Execute runs a range query and returns vectors indexed by timestamp.
-func (e *Executor) Execute(
+func (a *APIClient) QueryExpr(
 	ctx context.Context,
 	expr string,
 	from time.Time,
@@ -97,37 +95,57 @@ func (e *Executor) Execute(
 ) (map[int64]promql.Vector, []time.Time, error) {
 	from = alignToStep(from, interval)
 	to = alignToStep(to, interval)
-	timestamps := generateTimestamps(from, to, interval)
-	vectors := make(map[int64]promql.Vector, len(timestamps))
-	var vectorsMu sync.Mutex
 
-	expected := make(map[int64]struct{}, len(timestamps))
+	var (
+		timestamps = generateTimestamps(from, to, interval)
+		vectors    = make(map[int64]promql.Vector, len(timestamps))
+		vectorsMu  sync.Mutex
+	)
+
+	windows := make(map[time.Time]struct{}, len(timestamps))
 	for _, ts := range timestamps {
-		expected[ts.UnixMilli()] = struct{}{}
+		windows[ts] = struct{}{}
 	}
 
-	windows := splitTimeRange(from, to, interval)
+	var (
+		eg errgroup.Group
+		i  = 0
+	)
+	eg.SetLimit(a.parallelism)
+
 	zlog.Debug().Int("windows", len(windows)).Msg("split time range")
 
-	var eg errgroup.Group
-	eg.SetLimit(e.parallelism)
+	for start := range windows {
+		i += 1
 
-	for i, w := range windows {
+		end := start.Add(interval)
+		if end.After(to) {
+			end = to
+		}
+
 		eg.Go(func() error {
 			zlog.Debug().
 				Str("query", expr).
-				Int("window", i+1).
+				Int("window", i).
 				Int("total", len(windows)).
-				Time("from", w.start).
-				Time("to", w.end).
+				Time("from", start).
+				Time("to", end).
 				Msg("executing query")
 
-			matrix, err := e.queryRange(ctx, expr, w.start, w.end, interval)
+			matrix, err := a.queryRange(ctx, expr, start, end, interval)
 			if err != nil {
-				return fmt.Errorf("querying window %d/%d: %w", i+1, len(windows), err)
+				return fmt.Errorf("querying window %d/%d: %w", i, len(windows), err)
 			}
 
-			e.processMatrix(matrix, expected, vectors, &vectorsMu)
+			samples := a.processMatrix(matrix, start)
+
+			vectorsMu.Lock()
+			defer vectorsMu.Unlock()
+
+			for _, sample := range samples {
+				vectors[sample.T] = append(vectors[sample.T], sample)
+			}
+
 			return nil
 		})
 	}
@@ -139,41 +157,16 @@ func (e *Executor) Execute(
 	return vectors, timestamps, nil
 }
 
-type timeWindow struct {
-	start time.Time
-	end   time.Time
-}
-
-func splitTimeRange(from, to time.Time, interval time.Duration) []timeWindow {
-	maxDuration := time.Duration(maxPointsPerQuery) * interval
-
-	var windows []timeWindow
-	for start := from; start.Before(to); {
-		end := start.Add(maxDuration)
-		if end.After(to) {
-			end = to
-		}
-		windows = append(windows, timeWindow{start: start, end: end})
-		start = end.Add(interval)
-	}
-
-	if len(windows) == 0 {
-		windows = append(windows, timeWindow{start: from, end: to})
-	}
-
-	return windows
-}
-
-func (e *Executor) queryRange(
+func (a *APIClient) queryRange(
 	ctx context.Context,
 	expr string,
 	from, to time.Time,
 	interval time.Duration,
 ) (model.Matrix, error) {
-	ctx, cancel := context.WithTimeout(ctx, e.queryTimeout)
+	ctx, cancel := context.WithTimeout(ctx, a.queryTimeout)
 	defer cancel()
 
-	result, warnings, err := e.api.QueryRange(ctx, expr, v1.Range{
+	result, warnings, err := a.api.QueryRange(ctx, expr, v1.Range{
 		Start: from,
 		End:   to,
 		Step:  interval,
@@ -194,12 +187,9 @@ func (e *Executor) queryRange(
 	return matrix, nil
 }
 
-func (e *Executor) processMatrix(
-	matrix model.Matrix,
-	expected map[int64]struct{},
-	vectors map[int64]promql.Vector,
-	mu *sync.Mutex,
-) {
+func (a *APIClient) processMatrix(matrix model.Matrix, expectedTimestamp time.Time) []promql.Sample {
+	var samples []promql.Sample
+
 	for _, stream := range matrix {
 		lb := labels.NewBuilder(labels.EmptyLabels())
 		for k, v := range stream.Metric {
@@ -208,22 +198,22 @@ func (e *Executor) processMatrix(
 		metricLabels := lb.Labels()
 
 		for _, sample := range stream.Values {
-			tsMs := sample.Timestamp.Time().UnixMilli()
-			if _, ok := expected[tsMs]; !ok {
+			ts := sample.Timestamp.Time().UnixMilli()
+			if expectedTimestamp.UnixMilli() != ts {
 				continue
 			}
 
-			promSample := promql.Sample{
-				T:      tsMs,
+			sample := promql.Sample{
+				T:      ts,
 				F:      float64(sample.Value),
 				Metric: metricLabels,
 			}
 
-			mu.Lock()
-			vectors[tsMs] = append(vectors[tsMs], promSample)
-			mu.Unlock()
+			samples = append(samples, sample)
 		}
 	}
+
+	return samples
 }
 
 func generateTimestamps(from time.Time, to time.Time, interval time.Duration) []time.Time {

@@ -11,6 +11,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/rs/zerolog"
 	zlog "github.com/rs/zerolog/log"
+
 	"github.com/steved/alertreplay/internal/prometheus"
 	"github.com/steved/alertreplay/internal/relativetime"
 )
@@ -28,6 +29,7 @@ type Global struct {
 
 type VerboseFlag bool
 
+//nolint:unparam
 func (v VerboseFlag) BeforeApply() error {
 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	return nil
@@ -54,12 +56,12 @@ func (g *Global) Targets(ctx context.Context) ([]metricsql.LabelFilter, error) {
 
 	switch {
 	case g.By != "":
-		exec, err := prometheus.NewExecutor(g.PrometheusURL, g.Parallelism)
+		client, err := prometheus.NewAPIClient(g.PrometheusURL, g.Parallelism)
 		if err != nil {
-			return nil, fmt.Errorf("creating Prometheus client: %w", err)
+			return nil, fmt.Errorf("creating prometheus API client: %w", err)
 		}
 
-		targets, err = exec.LabelValues(ctx, g.By, g.To)
+		targets, err = client.LabelValues(ctx, g.By, g.To)
 		if err != nil {
 			return nil, fmt.Errorf("discovering label values: %w", err)
 		}
