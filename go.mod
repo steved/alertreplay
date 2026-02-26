@@ -12,6 +12,7 @@ require (
 	github.com/prometheus/common v0.67.4
 	github.com/prometheus/prometheus v0.308.0
 	github.com/rs/zerolog v1.34.0
+	github.com/stretchr/testify v1.11.1
 	golang.org/x/sync v0.19.0
 	golang.org/x/term v0.38.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -103,6 +104,7 @@ require (
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/alertmanager v0.28.1 // indirect
 	github.com/prometheus/client_golang/exp v0.0.0-20250914183048-a974e0d45e0a // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect

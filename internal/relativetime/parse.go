@@ -12,7 +12,8 @@ const timeFormat = "2006-01-02 15:04:05"
 
 var (
 	relativeTimeRegex = regexp.MustCompile(`(?i)^(\d+)\s*(second|minute|hour|day|week|month|year)s?\s+ago$`)
-	now               = sync.OnceValue(time.Now)
+	// Since we're not doing anything interactive, init the time once during parsing and then freeze it.
+	now = sync.OnceValue(time.Now)
 )
 
 func Parse(s string) (time.Time, error) {

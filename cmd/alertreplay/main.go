@@ -61,7 +61,7 @@ func (ct clusterTarget) nameForLog() string {
 }
 
 func (g *Global) clusterTargets(ctx context.Context) ([]clusterTarget, error) {
-	return []clusterTarget{}, nil
+	return []clusterTarget{{promURL: g.PrometheusURL}}, nil
 }
 
 // 	if c.ByCluster {
