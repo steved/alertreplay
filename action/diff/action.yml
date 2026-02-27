@@ -1,0 +1,169 @@
+name: alertreplay diff
+description: >
+  Discover changed VMRule YAML files in a PR, run `alertreplay diff` for each
+  changed alert, and post results as a PR comment.
+  The caller must check out the repo with fetch-depth: 0 so that base/head
+  SHAs are available.
+
+inputs:
+  alerts-directory:
+    description: Path to the directory containing VMRule YAML files.
+    required: true
+  prometheus-url:
+    description: Prometheus API endpoint.
+    required: true
+  from:
+    description: "Start time for evaluation (e.g. '7 days ago')."
+    required: false
+    default: "7 days ago"
+  to:
+    description: "End time for evaluation (e.g. 'now')."
+    required: false
+    default: "now"
+  interval:
+    description: Query interval.
+    required: false
+    default: "30s"
+  version:
+    description: alertreplay release version to download (e.g. '0.1.0'). Use 'latest' for the most recent release.
+    required: false
+    default: "latest"
+  ignore-labels:
+    description: Comma-separated labels to ignore in diff.
+    required: false
+  extra-args:
+    description: "Additional CLI flags passed to alertreplay (e.g. '--by cluster')."
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Download alertreplay
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+
+        if [ "$VERSION" = "latest" ]; then
+          gh release download --repo steved/alertreplay --pattern 'alertreplay_v*_linux_amd64.tar.gz' --dir "$RUNNER_TEMP"
+        else
+          gh release download "v${VERSION}" --repo steved/alertreplay --pattern 'alertreplay_v*_linux_amd64.tar.gz' --dir "$RUNNER_TEMP"
+        fi
+
+        tar -xzf "$RUNNER_TEMP"/alertreplay_v*_linux_amd64.tar.gz -C "$RUNNER_TEMP"
+        chmod +x "$RUNNER_TEMP/alertreplay"
+        echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+    - name: Discover changed alerts and run diffs
+      id: diff
+      shell: bash
+      env:
+        ALERTS_DIR: ${{ inputs.alerts-directory }}
+        PROMETHEUS_URL: ${{ inputs.prometheus-url }}
+        FROM: ${{ inputs.from }}
+        TO: ${{ inputs.to }}
+        INTERVAL: ${{ inputs.interval }}
+        IGNORE_LABELS: ${{ inputs.ignore-labels }}
+        EXTRA_ARGS: ${{ inputs.extra-args }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        HEAD_SHA: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+
+        changed_files=$(git diff --name-only --diff-filter=AM "${BASE_SHA}...${HEAD_SHA}" -- "$ALERTS_DIR")
+
+        if [ -z "$changed_files" ]; then
+          echo "No changed alert files found."
+          exit 0
+        fi
+
+        result=""
+
+        while IFS= read -r file; do
+          # Extract alert names from the head version of the file
+          alert_names=$(yq eval '.spec.groups[].rules[].alert // empty' "$file" 2>/dev/null || true)
+
+          if [ -z "$alert_names" ]; then
+            continue
+          fi
+
+          # Check if the file existed in the base
+          base_exists=true
+          git show "${BASE_SHA}:${file}" > /dev/null 2>&1 || base_exists=false
+
+          if [ "$base_exists" = "false" ]; then
+            echo "Skipping $file: new file with no base version to compare."
+            continue
+          fi
+
+          base_file=$(mktemp)
+          git show "${BASE_SHA}:${file}" > "$base_file"
+
+          while IFS= read -r alert_name; do
+            [ -z "$alert_name" ] && continue
+
+            echo "Running diff for alert '$alert_name' in $file"
+
+            ignore_flags=""
+            if [ -n "$IGNORE_LABELS" ]; then
+              IFS=',' read -ra labels <<< "$IGNORE_LABELS"
+              for label in "${labels[@]}"; do
+                ignore_flags="$ignore_flags --ignore-labels $(echo "$label" | xargs)"
+              done
+            fi
+
+            diff_output=$(alertreplay diff \
+              --prometheus-url "$PROMETHEUS_URL" \
+              --from "$FROM" \
+              --to "$TO" \
+              --interval "$INTERVAL" \
+              $ignore_flags \
+              $EXTRA_ARGS \
+              "$base_file" "$file" "$alert_name" 2>&1) || true
+
+            if [ -n "$diff_output" ]; then
+              result="${result}
+        ### \`${alert_name}\` (\`${file}\`)
+
+        \`\`\`
+        ${diff_output}
+        \`\`\`
+        "
+            fi
+          done <<< "$alert_names"
+
+          rm -f "$base_file"
+        done <<< "$changed_files"
+
+        if [ -n "$result" ]; then
+          {
+            echo "body<<ALERTREPLAY_EOF"
+            echo "<!-- alertreplay-diff -->"
+            echo "## alertreplay diff"
+            echo "$result"
+            echo "ALERTREPLAY_EOF"
+          } >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Post PR comment
+      if: steps.diff.outputs.body
+      shell: bash
+      env:
+        BODY: ${{ steps.diff.outputs.body }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        GH_REPO: ${{ github.repository }}
+      run: |
+        set -euo pipefail
+
+        # Find existing comment by marker
+        existing_comment_id=$(gh api "repos/${GH_REPO}/issues/${PR_NUMBER}/comments" \
+          --jq '.[] | select(.body | contains("<!-- alertreplay-diff -->")) | .id' | head -1 || true)
+
+        if [ -n "$existing_comment_id" ]; then
+          gh api "repos/${GH_REPO}/issues/comments/${existing_comment_id}" \
+            --method PATCH \
+            --field body="$BODY"
+        else
+          gh pr comment "$PR_NUMBER" --body "$BODY"
+        fi
