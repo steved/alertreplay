@@ -7,9 +7,10 @@ import (
 	"time"
 
 	"github.com/prometheus/prometheus/model/labels"
-	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/prometheus/prometheus/rules"
 	zlog "github.com/rs/zerolog/log"
+
+	"github.com/steved/alertreplay/internal/prometheus"
 )
 
 type EventType int
@@ -30,7 +31,7 @@ type Evaluator struct {
 }
 
 func New(name string, expr string, forDuration time.Duration) (*Evaluator, error) {
-	parsedExpr, err := parser.ParseExpr(expr)
+	parsedExpr, err := prometheus.Parser.ParseExpr(expr)
 	if err != nil {
 		return nil, fmt.Errorf("parsing expression: %w", err)
 	}

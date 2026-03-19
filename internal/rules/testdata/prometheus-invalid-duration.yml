@@ -1,0 +1,6 @@
+groups:
+  - name: test
+    rules:
+      - alert: BadDuration
+        expr: up == 0
+        for: notaduration

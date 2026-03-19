@@ -26,7 +26,7 @@ import (
 	"github.com/steved/alertreplay/internal/dashboard"
 	"github.com/steved/alertreplay/internal/output"
 	promclient "github.com/steved/alertreplay/internal/prometheus"
-	"github.com/steved/alertreplay/internal/vmrule"
+	"github.com/steved/alertreplay/internal/rules"
 )
 
 const (
@@ -60,7 +60,7 @@ func TestIntegration(t *testing.T) {
 	defer pollCancel()
 	waitForData(t, pollCtx, promAPI, `test_service_up{service="abc"}`)
 
-	rule, err := vmrule.ParseAlertRule("testdata/test_alert.yml", "TestServiceDown")
+	rule, err := rules.ParseAlertRule("testdata/test_alert.yml", "TestServiceDown")
 	require.NoError(t, err)
 
 	client, err := promclient.NewAPIClient(promEndpoint, 10)
@@ -97,13 +97,13 @@ func TestIntegration(t *testing.T) {
 		t,
 		pollCtx,
 		client,
-		*rule,
+		rule,
 		evalFrom,
 		evaluationInterval,
 		urlBuilder,
 	)
 
-	alerts, err := alert.Evaluate(t.Context(), client, *rule, evalFrom, evalTo, evaluationInterval, urlBuilder)
+	alerts, err := alert.Evaluate(t.Context(), client, rule, evalFrom, evalTo, evaluationInterval, urlBuilder)
 	require.NoError(t, err)
 
 	freezeAlerts(alerts, rule.Expr, urlBuilder)

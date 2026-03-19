@@ -11,12 +11,12 @@ import (
 	"github.com/steved/alertreplay/internal/alert"
 	"github.com/steved/alertreplay/internal/output"
 	"github.com/steved/alertreplay/internal/prometheus"
-	"github.com/steved/alertreplay/internal/vmrule"
+	"github.com/steved/alertreplay/internal/rules"
 )
 
 type DiffCmd struct {
-	File1        string   `arg:"" name:"file1" help:"First alert rules file (VMRule format)." required:""`
-	File2        string   `arg:"" name:"file2" help:"Second alert rules file (VMRule format)." required:""`
+	File1        string   `arg:"" name:"file1" help:"First alert rules file (VMRule or Prometheus rule groups)." required:""`
+	File2        string   `arg:"" name:"file2" help:"Second alert rules file (VMRule or Prometheus rule groups)." required:""`
 	AlertName    string   `arg:"" name:"alert-name" help:"Name of the alert to compare." required:""`
 	IgnoreLabels []string `help:"Labels to ignore when comparing alerts." name:"ignore-labels"`
 }
@@ -24,12 +24,12 @@ type DiffCmd struct {
 func (cmd *DiffCmd) Run(g *Global) error {
 	ctx := context.Background()
 
-	rule1, err := vmrule.ParseAlertRule(cmd.File1, cmd.AlertName)
+	rule1, err := rules.ParseAlertRule(cmd.File1, cmd.AlertName)
 	if err != nil {
 		return fmt.Errorf("file1 (%s): parsing alert rule: %w", cmd.File1, err)
 	}
 
-	rule2, err := vmrule.ParseAlertRule(cmd.File2, cmd.AlertName)
+	rule2, err := rules.ParseAlertRule(cmd.File2, cmd.AlertName)
 	if err != nil {
 		return fmt.Errorf("file2 (%s): parsing alert rule: %w", cmd.File2, err)
 	}
@@ -58,18 +58,18 @@ func (cmd *DiffCmd) Run(g *Global) error {
 	var eg errgroup.Group
 	for _, target := range targets {
 		eg.Go(func() error {
-			r := *rule1
+			targetRule := rule1
 
 			if target.Label != "" {
-				expr, err := prometheus.RewriteExpr(r.Expr, target)
+				expr, err := prometheus.RewriteExpr(targetRule.Expr, target)
 				if err != nil {
 					return fmt.Errorf("creating new expr for target %s: %w", target.AppendString(nil), err)
 				}
 
-				r.Expr = expr
+				targetRule.Expr = expr
 			}
 
-			alerts, err := alert.Evaluate(ctx, client, r, g.From, g.To, g.Interval, urlBuilder)
+			alerts, err := alert.Evaluate(ctx, client, targetRule, g.From, g.To, g.Interval, urlBuilder)
 			if err != nil {
 				return fmt.Errorf("executing alert expr for file1 (%s): %w", cmd.File1, err)
 			}
@@ -88,18 +88,18 @@ func (cmd *DiffCmd) Run(g *Global) error {
 		})
 
 		eg.Go(func() error {
-			r := *rule2
+			targetRule := rule2
 
 			if target.Label != "" {
-				expr, err := prometheus.RewriteExpr(r.Expr, target)
+				expr, err := prometheus.RewriteExpr(targetRule.Expr, target)
 				if err != nil {
 					return fmt.Errorf("creating new expr for target %s: %w", target.AppendString(nil), err)
 				}
 
-				r.Expr = expr
+				targetRule.Expr = expr
 			}
 
-			alerts, err := alert.Evaluate(ctx, client, r, g.From, g.To, g.Interval, urlBuilder)
+			alerts, err := alert.Evaluate(ctx, client, targetRule, g.From, g.To, g.Interval, urlBuilder)
 			if err != nil {
 				return fmt.Errorf("executing alert expr for file2 (%s): %w", cmd.File2, err)
 			}

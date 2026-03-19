@@ -12,18 +12,18 @@ import (
 	"github.com/steved/alertreplay/internal/alert"
 	"github.com/steved/alertreplay/internal/output"
 	"github.com/steved/alertreplay/internal/prometheus"
-	"github.com/steved/alertreplay/internal/vmrule"
+	"github.com/steved/alertreplay/internal/rules"
 )
 
 type ReplayCmd struct {
-	AlertFile string `arg:"" name:"alert-file" help:"Alert rules file (VMRule format)." required:""`
+	AlertFile string `arg:"" name:"alert-file" help:"Alert rules file (VMRule or Prometheus rule groups)." required:""`
 	AlertName string `arg:"" name:"alert-name" help:"Name of the alert to replay." required:""`
 }
 
 func (cmd *ReplayCmd) Run(g *Global) error {
 	ctx := context.Background()
 
-	r, err := vmrule.ParseAlertRule(cmd.AlertFile, cmd.AlertName)
+	r, err := rules.ParseAlertRule(cmd.AlertFile, cmd.AlertName)
 	if err != nil {
 		return fmt.Errorf("parsing alert rule: %w", err)
 	}
@@ -57,7 +57,8 @@ func (cmd *ReplayCmd) Run(g *Global) error {
 	var eg errgroup.Group
 	for _, target := range targets {
 		eg.Go(func() error {
-			targetRule := *r
+			targetRule := r
+
 			if target.Label != "" {
 				expr, err := prometheus.RewriteExpr(r.Expr, target)
 				if err != nil {
