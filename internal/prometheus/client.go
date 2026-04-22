@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -23,7 +22,7 @@ const (
 )
 
 type Client interface {
-	LabelValues(context.Context, string, time.Time) ([]metricsql.LabelFilter, error)
+	LabelValues(context.Context, string, time.Time, time.Time) ([]metricsql.LabelFilter, error)
 	QueryExpr(context.Context, string, time.Time, time.Time, time.Duration) (map[int64]promql.Vector, []time.Time, error)
 }
 
@@ -46,12 +45,8 @@ func NewAPIClient(prometheusURL string, parallelism int) (*APIClient, error) {
 	}, nil
 }
 
-func (a *APIClient) LabelValues(ctx context.Context, label string, ts time.Time) ([]metricsql.LabelFilter, error) {
-	ctx, cancel := context.WithTimeout(ctx, a.queryTimeout)
-	defer cancel()
-
-	query := fmt.Sprintf(`clamp_max(count({%s!=""}) by (%s), 1)`, label, label)
-	result, warnings, err := a.api.Query(ctx, query, ts)
+func (a *APIClient) LabelValues(ctx context.Context, label string, from, to time.Time) ([]metricsql.LabelFilter, error) {
+	labelValues, warnings, err := a.api.LabelValues(ctx, label, nil, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -60,28 +55,16 @@ func (a *APIClient) LabelValues(ctx context.Context, label string, ts time.Time)
 		zlog.Warn().Str("warning", w).Msg("label values discovery warning")
 	}
 
-	vector, ok := result.(model.Vector)
-	if !ok {
-		return nil, fmt.Errorf("unexpected result type for label values discovery: %T", result)
+	if len(labelValues) == 0 {
+		return nil, fmt.Errorf("no values found for label %q", label)
 	}
 
-	values := make([]metricsql.LabelFilter, 0, len(vector))
-	for _, sample := range vector {
-		value := string(sample.Metric[model.LabelName(label)])
-		if value == "" {
-			continue
-		}
-		values = append(values, metricsql.LabelFilter{Label: label, Value: value})
-	}
+	slices.Sort(labelValues)
 
-	if len(values) == 0 {
-		return nil, fmt.Errorf("no values found with query %q", query)
+	values := make([]metricsql.LabelFilter, 0, len(labelValues))
+	for _, labelValue := range labelValues {
+		values = append(values, metricsql.LabelFilter{Label: label, Value: string(labelValue)})
 	}
-
-	slices.SortFunc(values, func(l, r metricsql.LabelFilter) int {
-		return strings.Compare(l.Value, r.Value)
-	})
-	values = slices.Compact(values)
 
 	return values, nil
 }

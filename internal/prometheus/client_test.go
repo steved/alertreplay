@@ -170,9 +170,14 @@ func TestProcessMatrix(t *testing.T) {
 
 type fakePrometheusClient struct {
 	promv1.API
+
 	query  string
 	result model.Value
-	err    error
+
+	label       string
+	labelValues model.LabelValues
+
+	err error
 }
 
 func (f *fakePrometheusClient) Query(
@@ -185,26 +190,39 @@ func (f *fakePrometheusClient) Query(
 	return f.result, nil, f.err
 }
 
+func (f *fakePrometheusClient) LabelValues(
+	_ context.Context,
+	label string,
+	_ []string,
+	_ time.Time,
+	_ time.Time,
+	_ ...promv1.Option,
+) (model.LabelValues, promv1.Warnings, error) {
+	f.label = label
+	return f.labelValues, nil, f.err
+}
+
 func TestLabelValues(t *testing.T) {
 	api := &fakePrometheusClient{
-		result: model.Vector{
-			&model.Sample{Metric: model.Metric{"cluster": "b"}},
-			&model.Sample{Metric: model.Metric{"cluster": "a"}},
-			&model.Sample{Metric: model.Metric{"cluster": "a"}},
-			&model.Sample{Metric: model.Metric{"cluster": ""}},
-		},
+		labelValues: model.LabelValues{"test1", "test2"},
 	}
 	client := &APIClient{
 		api:          api,
 		queryTimeout: time.Second,
 	}
 
-	got, err := client.LabelValues(t.Context(), "cluster", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	got, err := client.LabelValues(
+		t.Context(),
+		"cluster",
+		time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC),
+	)
+
 	require.NoError(t, err)
 
-	assert.Equal(t, `clamp_max(count({cluster!=""}) by (cluster), 1)`, api.query)
+	assert.Equal(t, "cluster", api.label)
 	assert.Equal(t, []metricsql.LabelFilter{
-		{Label: "cluster", Value: "a"},
-		{Label: "cluster", Value: "b"},
+		{Label: "cluster", Value: "test1"},
+		{Label: "cluster", Value: "test2"},
 	}, got)
 }

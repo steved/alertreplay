@@ -76,7 +76,7 @@ func (g *Global) Targets(ctx context.Context) ([]metricsql.LabelFilter, error) {
 			return nil, fmt.Errorf("creating prometheus API client: %w", err)
 		}
 
-		targets, err = client.LabelValues(ctx, g.By, g.To)
+		targets, err = client.LabelValues(ctx, g.By, g.From, g.To)
 		if err != nil {
 			return nil, fmt.Errorf("discovering label values: %w", err)
 		}
