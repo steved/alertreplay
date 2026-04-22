@@ -49,9 +49,14 @@ func (g *grafana) BuildURL(expr string, from time.Time, to *time.Time) string {
 	leftJSON, _ := json.Marshal(left)
 
 	u := *g.base
+
 	q := u.Query()
 	q.Set("left", string(leftJSON))
 	u.RawQuery = q.Encode()
+
+	if u.Path == "" {
+		u.Path = "/explore"
+	}
 
 	return u.String()
 }
