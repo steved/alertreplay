@@ -3,11 +3,15 @@ package rules
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/rulefmt"
 	"gopkg.in/yaml.v3"
+
+	"github.com/rs/zerolog"
+	zlog "github.com/rs/zerolog/log"
 
 	"github.com/steved/alertreplay/internal/prometheus"
 )
@@ -39,6 +43,7 @@ func parseFile(filePath string) (*rulefmt.RuleGroups, error) {
 		false,
 		model.UTF8Validation,
 		prometheus.Parser,
+		slog.New(zerolog.NewSlogHandler(zlog.Logger)),
 	)
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
